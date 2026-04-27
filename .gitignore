@@ -1,0 +1,28 @@
+# Sanal Ortam
+.venv/
+venv/
+env/
+
+# Çevresel Değişkenler ve Gizli Dosyalar
+.env
+.env.local
+
+# Python Önbellek Dosyaları
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# IDE ve Editör Ayarları
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Streamlit Önbelleği
+.streamlit/
+
+# İşletim Sistemi Dosyaları
+.DS_Store
+Thumbs.db
