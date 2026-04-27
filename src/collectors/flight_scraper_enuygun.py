@@ -12,14 +12,32 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 RAW_DIR = Path("data/raw")
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-TARGET_URL = "https://www.enuygun.com/ucak-bileti/arama/istanbul-antalya-havalimani-ista-ayt/?gidis=07.05.2026&donus=09.05.2026&yetiskin=1&sinif=ekonomi&currency=TRY&save=1&ref=homepage&geotrip=domestic&trip=domestic"
-
 SOURCE = "enuygun"
-ORIGIN = "IST"
-DESTINATION = "AYT"
-DEPART_DATE = "2026-05-07"
-RETURN_DATE = "2026-05-09"
 CURRENCY = "TRY"
+
+ROUTES = [
+    {
+        "origin": "IST", 
+        "destination": "AYT", 
+        "depart_date": "2026-05-07",
+        "return_date": "2026-05-09",
+        "url": "https://www.enuygun.com/ucak-bileti/arama/istanbul-antalya-havalimani-ista-ayt/?gidis=07.05.2026&donus=09.05.2026&yetiskin=1&sinif=ekonomi&currency=TRY&save=1&ref=homepage&geotrip=domestic&trip=domestic"
+    },
+    {
+        "origin": "SAW", 
+        "destination": "ESB", 
+        "depart_date": "2026-05-07",
+        "return_date": "2026-05-09",
+        "url": "https://www.enuygun.com/ucak-bileti/arama/istanbul-sabiha-gokcen-havalimani-ankara-esenboga-havalimani-saw-esb/?gidis=07.05.2026&donus=09.05.2026&yetiskin=1&sinif=ekonomi&currency=TRY&save=1"
+    },
+    {
+        "origin": "IST", 
+        "destination": "ADB", 
+        "depart_date": "2026-05-07",
+        "return_date": "2026-05-09",
+        "url": "https://www.enuygun.com/ucak-bileti/arama/istanbul-izmir-adnan-menderes-havalimani-ista-adb/?gidis=07.05.2026&donus=09.05.2026&yetiskin=1&sinif=ekonomi&currency=TRY&save=1"
+    }
+]
 
 def now_ts() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -40,7 +58,6 @@ def parse_tr_number_to_float(num_text: str) -> Optional[float]:
     elif "," in t:
         t = t.replace(",", ".")
     else:
-        # sadece binlik ayıracı olabilir
         t = t.replace(".", "")
     try:
         return float(t)
@@ -48,27 +65,14 @@ def parse_tr_number_to_float(num_text: str) -> Optional[float]:
         return None
 
 def extract_price_from_text(text: str) -> Optional[float]:
-    """
-    Kart metninden fiyat yakalar.
-    Örnek eşleşmeler:
-      - 1.478 TL
-      - 1478 TL
-      - ₺1.478
-      - 1.478,50 TL
-    """
     if not text:
         return None
-
-    # Önce "sayı + TL"
     m = re.search(r"(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)\s*TL\b", text, flags=re.IGNORECASE)
     if m:
         return parse_tr_number_to_float(m.group(1))
-
-    # Sonra "₺ + sayı"
     m = re.search(r"₺\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)", text, flags=re.IGNORECASE)
     if m:
         return parse_tr_number_to_float(m.group(1))
-
     return None
 
 def extract_airline_from_text(text: str) -> str:
@@ -82,7 +86,6 @@ def extract_airline_from_text(text: str) -> str:
     return "Unknown"
 
 def extract_times_from_text(text: str) -> tuple[str, str]:
-    # örn: 00:10 ... 01:30
     times = re.findall(r"\b([0-2]\d:[0-5]\d)\b", text)
     if len(times) >= 2:
         return times[0], times[1]
@@ -90,7 +93,7 @@ def extract_times_from_text(text: str) -> tuple[str, str]:
         return times[0], ""
     return "", ""
 
-def scrape_enuygun() -> list[dict]:
+def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, return_date: str) -> list[dict]:
     rows: list[dict] = []
 
     with sync_playwright() as p:
@@ -103,10 +106,9 @@ def scrape_enuygun() -> list[dict]:
         )
         page = context.new_page()
 
-        page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=120000)
+        page.goto(url, wait_until="domcontentloaded", timeout=120000)
         jitter(2.0, 3.5)
 
-        # cookie popup vs.
         for sel in [
             'button:has-text("Kabul et")',
             'button:has-text("Tümünü kabul et")',
@@ -121,7 +123,6 @@ def scrape_enuygun() -> list[dict]:
             except Exception:
                 pass
 
-        # sonuçlar yüklensin
         found = None
         for rs in ['[data-testid*="flight"]', '[class*="flight"]', 'article', 'li']:
             try:
@@ -132,14 +133,14 @@ def scrape_enuygun() -> list[dict]:
                 continue
 
         if not found:
-            print("[WARN] Sonuç elemanı bulunamadı.")
+            print(f"[WARN] Sonuç elemanı bulunamadı: {origin}-{destination}")
             context.close()
             browser.close()
             return rows
 
         cards = page.locator('[data-testid*="flight"]')
         count = cards.count()
-        print(f"[INFO] Card selector: [data-testid*='flight'] | count={count}")
+        print(f"[INFO] {origin}-{destination} için incelenen kart sayısı: {count}")
 
         rid = make_run_id()
         seen = set()
@@ -158,7 +159,32 @@ def scrape_enuygun() -> list[dict]:
             if price is None:
                 continue
 
-            airline = extract_airline_from_text(txt)
+# --- TERMİNATÖR HAVAYOLU BULUCU (HTML Brute-Force) ---
+            airline = "Unknown"
+            try:
+                # 1. Önce kartın tüm arka plan HTML'ini alıp küçük harfe çevirelim
+                html_content = card.inner_html().lower()
+                
+                # 2. HTML'in içinde havayolu isimleri veya havayolu kodları geçiyor mu bakalım
+                # (Sıralama önemli: Önce spesifik olanlar)
+                if "türk hava yolları" in html_content or "thy" in html_content or "tk.png" in html_content:
+                    airline = "THY"
+                elif "pegasus" in html_content or "pc.png" in html_content:
+                    airline = "Pegasus"
+                elif "ajet" in html_content or "vf.png" in html_content:
+                    airline = "AJet"
+                elif "sunexpress" in html_content or "xq.png" in html_content:
+                    airline = "SunExpress"
+                elif "anadolujet" in html_content:
+                    airline = "AnadoluJet"
+                    
+                # 3. Hala bulamadıysa, kartın düz metninde son bir şansımızı deneyelim
+                if airline == "Unknown":
+                    airline = extract_airline_from_text(txt)
+            except Exception as e:
+                pass
+            # -----------------------------------------------------------
+
             dep_time, arr_time = extract_times_from_text(txt)
 
             key = (airline, dep_time, arr_time, price)
@@ -169,16 +195,16 @@ def scrape_enuygun() -> list[dict]:
             rows.append({
                 "scrape_ts": now_ts(),
                 "source": SOURCE,
-                "origin": ORIGIN,
-                "destination": DESTINATION,
-                "depart_date": DEPART_DATE,
-                "return_date": RETURN_DATE,
+                "origin": origin,
+                "destination": destination,
+                "depart_date": depart_date,
+                "return_date": return_date,
                 "airline": airline,
                 "depart_time": dep_time,
                 "arrival_time": arr_time,
                 "price": price,
                 "currency": CURRENCY,
-                "raw_url": TARGET_URL,
+                "raw_url": url,
                 "run_id": rid
             })
 
@@ -188,12 +214,31 @@ def scrape_enuygun() -> list[dict]:
     return rows
 
 def main():
-    rows = scrape_enuygun()
+    all_rows = []
     rid = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    print("🚀 Çoklu Rota Veri Kazıma İşlemi Başlıyor...")
+    
+    #Tüm rotaları döngüye alıyoruz
+    for route in ROUTES:
+        print(f"\n[INFO] Sıradaki Rota: {route['origin']} -> {route['destination']}")
+        rows = scrape_enuygun(
+            url=route["url"],
+            origin=route["origin"],
+            destination=route["destination"],
+            depart_date=route["depart_date"],
+            return_date=route["return_date"]
+        )
+        all_rows.extend(rows)
+        
+        #Sunucuyu yormamak ve ban yememek için rotalar arası bekleme
+        jitter(3.0, 6.0)
+
     out = RAW_DIR / f"flights_enuygun_{rid}.json"
-    out.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[OK] Enuygun kayıt sayısı: {len(rows)}")
-    print(f"[OK] Kaydedildi: {out}")
+    out.write_text(json.dumps(all_rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    print(f"\n[OK] İşlem Tamamlandı! Toplam çekilen kayıt: {len(all_rows)}")
+    print(f"[OK] Tüm rotalar tek dosyaya kaydedildi: {out}")
 
 if __name__ == "__main__":
     main()

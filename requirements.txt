@@ -1,0 +1,6 @@
+pandas
+matplotlib
+playwright
+scikit-learn
+xgboost
+streamlit

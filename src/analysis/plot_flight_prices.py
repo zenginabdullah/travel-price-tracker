@@ -26,7 +26,7 @@ def main():
           .sort_values("day")
     )
 
-    daily["day"] = pd.to_datetime(daily["day"])  # matplotlib için net tarih
+    daily["day"] = pd.to_datetime(daily["day"])  #matplotlib için
 
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(daily["day"], daily["min_price"], marker="o", label="Günlük Minimum")
@@ -39,7 +39,7 @@ def main():
     ax.grid(alpha=0.3)
     ax.legend()
 
-    # Tarih formatını sıkılaştır
+    #Tarih formatını sıkılaştır
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
     plt.xticks(rotation=30)
