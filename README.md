@@ -21,6 +21,8 @@ Başlangıç aşamasında kapsam bilinçli olarak dar tutulmuştur. Amaç; önce
 * **Otel:** 1 sabit bölge (ör. merkez nokta + yarıçap yaklaşımı)
 * **Zamanlama:** Günde 1 kez veya sınırlı periyotlarda veri toplama
 
+Uçuş verisi toplama tarafında ham çıktılar artık rota ve gün bazında ayrı JSON dosyaları olarak `data/raw/` altında saklanır. Örnek adlandırma: `flights_enuygun_20260501_IST_AYT.json`.
+
 ## ⚖️ Etik ve Hukuki Çerçeve
 Web kazıma (web scraping) adımlarına geçmeden önce aşağıdaki ilkelere uyulur:
 * Hedef kaynakların kullanım koşulları (ToS) ve `robots.txt` kontrol edilir.

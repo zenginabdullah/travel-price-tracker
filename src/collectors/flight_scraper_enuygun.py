@@ -3,7 +3,7 @@ import json
 import re
 import random
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -14,28 +14,40 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 SOURCE = "enuygun"
 CURRENCY = "TRY"
+START_DATE = date(2026, 5, 1)
+END_DATE = date(2026, 5, 31)
+DATE_FORMAT = "%d.%m.%Y"
 
 ROUTES = [
     {
         "origin": "IST", 
         "destination": "AYT", 
-        "depart_date": "2026-05-07",
-        "return_date": "2026-05-09",
-        "url": "https://www.enuygun.com/ucak-bileti/arama/istanbul-antalya-havalimani-ista-ayt/?gidis=07.05.2026&donus=09.05.2026&yetiskin=1&sinif=ekonomi&currency=TRY&save=1&ref=homepage&geotrip=domestic&trip=domestic"
+        "path": "istanbul-antalya-havalimani-ista-ayt"
+    },
+    {
+        "origin": "AYT", 
+        "destination": "IST", 
+        "path": "antalya-havalimani-istanbul-ayt-ista"
     },
     {
         "origin": "SAW", 
         "destination": "ESB", 
-        "depart_date": "2026-05-07",
-        "return_date": "2026-05-09",
-        "url": "https://www.enuygun.com/ucak-bileti/arama/istanbul-sabiha-gokcen-havalimani-ankara-esenboga-havalimani-saw-esb/?gidis=07.05.2026&donus=09.05.2026&yetiskin=1&sinif=ekonomi&currency=TRY&save=1"
+        "path": "istanbul-sabiha-gokcen-havalimani-ankara-esenboga-havalimani-saw-esb"
+    },
+    {
+        "origin": "ESB", 
+        "destination": "SAW", 
+        "path": "ankara-esenboga-havalimani-istanbul-sabiha-gokcen-havalimani-esb-saw"
     },
     {
         "origin": "IST", 
         "destination": "ADB", 
-        "depart_date": "2026-05-07",
-        "return_date": "2026-05-09",
-        "url": "https://www.enuygun.com/ucak-bileti/arama/istanbul-izmir-adnan-menderes-havalimani-ista-adb/?gidis=07.05.2026&donus=09.05.2026&yetiskin=1&sinif=ekonomi&currency=TRY&save=1"
+        "path": "istanbul-izmir-adnan-menderes-havalimani-ista-adb"
+    },
+    {
+        "origin": "ADB", 
+        "destination": "IST", 
+        "path": "izmir-adnan-menderes-havalimani-istanbul-adb-ista"
     }
 ]
 
@@ -75,14 +87,21 @@ def extract_price_from_text(text: str) -> Optional[float]:
         return parse_tr_number_to_float(m.group(1))
     return None
 
+def normalize_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().lower()
+
 def extract_airline_from_text(text: str) -> str:
-    known = [
-        "Pegasus", "Türk Hava Yolları", "THY", "AJet",
-        "SunExpress", "AnadoluJet"
-    ]
-    for k in known:
-        if k.lower() in text.lower():
-            return k
+    normalized = normalize_text(text)
+    airline_aliases = {
+        "THY": ["türk hava yolları", "turkish airlines", "thy", "tk"],
+        "Pegasus": ["pegasus", "pc"],
+        "AJet": ["ajet", "vf"],
+        "SunExpress": ["sunexpress", "xq"],
+        "AnadoluJet": ["anadolujet", "anadolu jet"],
+    }
+    for airline, aliases in airline_aliases.items():
+        if any(alias in normalized for alias in aliases):
+            return airline
     return "Unknown"
 
 def extract_times_from_text(text: str) -> tuple[str, str]:
@@ -93,7 +112,25 @@ def extract_times_from_text(text: str) -> tuple[str, str]:
         return times[0], ""
     return "", ""
 
-def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, return_date: str) -> list[dict]:
+def format_enuygun_date(value: date) -> str:
+    return value.strftime(DATE_FORMAT)
+
+def build_search_url(path: str, depart_date: date, return_date: Optional[date] = None) -> str:
+    query = [
+        f"gidis={format_enuygun_date(depart_date)}",
+        "yetiskin=1",
+        "sinif=ekonomi",
+        f"currency={CURRENCY}",
+        "save=1",
+        "ref=homepage",
+        "geotrip=domestic",
+        "trip=domestic",
+    ]
+    if return_date is not None:
+        query.insert(1, f"donus={format_enuygun_date(return_date)}")
+    return f"https://www.enuygun.com/ucak-bileti/arama/{path}/?{'&'.join(query)}"
+
+def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, return_date: str = "") -> list[dict]:
     rows: list[dict] = []
 
     with sync_playwright() as p:
@@ -138,7 +175,7 @@ def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, re
             browser.close()
             return rows
 
-        cards = page.locator('[data-testid*="flight"]')
+        cards = page.locator('.flight-item__wrapper')
         count = cards.count()
         print(f"[INFO] {origin}-{destination} için incelenen kart sayısı: {count}")
 
@@ -159,31 +196,13 @@ def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, re
             if price is None:
                 continue
 
-# --- TERMİNATÖR HAVAYOLU BULUCU (HTML Brute-Force) ---
             airline = "Unknown"
             try:
-                # 1. Önce kartın tüm arka plan HTML'ini alıp küçük harfe çevirelim
-                html_content = card.inner_html().lower()
-                
-                # 2. HTML'in içinde havayolu isimleri veya havayolu kodları geçiyor mu bakalım
-                # (Sıralama önemli: Önce spesifik olanlar)
-                if "türk hava yolları" in html_content or "thy" in html_content or "tk.png" in html_content:
-                    airline = "THY"
-                elif "pegasus" in html_content or "pc.png" in html_content:
-                    airline = "Pegasus"
-                elif "ajet" in html_content or "vf.png" in html_content:
-                    airline = "AJet"
-                elif "sunexpress" in html_content or "xq.png" in html_content:
-                    airline = "SunExpress"
-                elif "anadolujet" in html_content:
-                    airline = "AnadoluJet"
-                    
-                # 3. Hala bulamadıysa, kartın düz metninde son bir şansımızı deneyelim
+                airline = extract_airline_from_text(txt)
                 if airline == "Unknown":
-                    airline = extract_airline_from_text(txt)
-            except Exception as e:
+                    airline = extract_airline_from_text(card.inner_html())
+            except Exception:
                 pass
-            # -----------------------------------------------------------
 
             dep_time, arr_time = extract_times_from_text(txt)
 
@@ -213,32 +232,45 @@ def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, re
 
     return rows
 
-def main():
-    all_rows = []
-    rid = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    print("🚀 Çoklu Rota Veri Kazıma İşlemi Başlıyor...")
-    
-    #Tüm rotaları döngüye alıyoruz
-    for route in ROUTES:
-        print(f"\n[INFO] Sıradaki Rota: {route['origin']} -> {route['destination']}")
-        rows = scrape_enuygun(
-            url=route["url"],
-            origin=route["origin"],
-            destination=route["destination"],
-            depart_date=route["depart_date"],
-            return_date=route["return_date"]
-        )
-        all_rows.extend(rows)
-        
-        #Sunucuyu yormamak ve ban yememek için rotalar arası bekleme
-        jitter(3.0, 6.0)
+def daterange(start_date: date, end_date: date):
+    current = start_date
+    while current <= end_date:
+        yield current
+        current += timedelta(days=1)
 
-    out = RAW_DIR / f"flights_enuygun_{rid}.json"
-    out.write_text(json.dumps(all_rows, ensure_ascii=False, indent=2), encoding="utf-8")
-    
-    print(f"\n[OK] İşlem Tamamlandı! Toplam çekilen kayıt: {len(all_rows)}")
-    print(f"[OK] Tüm rotalar tek dosyaya kaydedildi: {out}")
+def main():
+    total_rows = 0
+
+    print("🚀 Çoklu rota ve tarih aralığı veri kazıma işlemi başlıyor...")
+    print(f"[INFO] Tarih aralığı: {START_DATE} -> {END_DATE}")
+
+    for travel_date in daterange(START_DATE, END_DATE):
+        travel_date_str = travel_date.strftime("%Y%m%d")
+        day_dir = RAW_DIR / travel_date_str
+        day_dir.mkdir(parents=True, exist_ok=True)
+        print(f"\n[INFO] İşlenen gün: {travel_date}")
+
+        for route in ROUTES:
+            url = build_search_url(route["path"], travel_date)
+
+            print(f"[INFO] Rota: {route['origin']} -> {route['destination']}")
+            rows = scrape_enuygun(
+                url=url,
+                origin=route["origin"],
+                destination=route["destination"],
+                depart_date=travel_date.isoformat(),
+                return_date=""
+            )
+
+            out = day_dir / f"{route['origin']}_{route['destination']}.json"
+            out.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+
+            total_rows += len(rows)
+            print(f"[OK] Yazıldı: {out} ({len(rows)} kayıt)")
+
+            jitter(3.0, 6.0)
+
+    print(f"\n[OK] İşlem Tamamlandı! Toplam çekilen kayıt: {total_rows}")
 
 if __name__ == "__main__":
     main()
