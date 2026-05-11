@@ -3,12 +3,12 @@ import json
 from pathlib import Path
 import pandas as pd
 
-RAW_DIR = Path("data/raw")
-PROCESSED_DIR = Path("data/processed")
+RAW_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "raw"
+PROCESSED_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_raw_files() -> pd.DataFrame:
-    files = sorted(RAW_DIR.glob("flights_enuygun_*.json"))
+    files = sorted(RAW_DIR.rglob("*.json"))
     rows = []
     for f in files:
         try:
@@ -37,8 +37,12 @@ def main():
         if col in df.columns:
             df[col] = df[col].fillna("").astype(str).str.strip()
 
+    # return_date kullanılmıyor (tek yön), sütunu düşür
+    if "return_date" in df.columns:
+        df = df.drop(columns=["return_date"])
+
     # duplicate azaltma
-    dedup_cols = [c for c in ["run_id", "price", "depart_date", "return_date", "origin", "destination", "airline", "depart_time", "arrival_time"] if c in df.columns]
+    dedup_cols = [c for c in ["run_id", "price", "depart_date", "origin", "destination", "airline", "depart_time", "arrival_time"] if c in df.columns]
     if dedup_cols:
         df = df.drop_duplicates(subset=dedup_cols)
 

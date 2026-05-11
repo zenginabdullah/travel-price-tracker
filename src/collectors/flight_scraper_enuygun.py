@@ -14,8 +14,8 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 SOURCE = "enuygun"
 CURRENCY = "TRY"
-START_DATE = date(2026, 5, 1)
-END_DATE = date(2026, 5, 31)
+START_DATE = date(2026, 6, 1)
+END_DATE = date(2026, 6, 14)
 DATE_FORMAT = "%d.%m.%Y"
 
 ROUTES = [
@@ -115,7 +115,7 @@ def extract_times_from_text(text: str) -> tuple[str, str]:
 def format_enuygun_date(value: date) -> str:
     return value.strftime(DATE_FORMAT)
 
-def build_search_url(path: str, depart_date: date, return_date: Optional[date] = None) -> str:
+def build_search_url(path: str, depart_date: date) -> str:
     query = [
         f"gidis={format_enuygun_date(depart_date)}",
         "yetiskin=1",
@@ -126,11 +126,9 @@ def build_search_url(path: str, depart_date: date, return_date: Optional[date] =
         "geotrip=domestic",
         "trip=domestic",
     ]
-    if return_date is not None:
-        query.insert(1, f"donus={format_enuygun_date(return_date)}")
     return f"https://www.enuygun.com/ucak-bileti/arama/{path}/?{'&'.join(query)}"
 
-def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, return_date: str = "") -> list[dict]:
+def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str) -> list[dict]:
     rows: list[dict] = []
 
     with sync_playwright() as p:
@@ -217,7 +215,6 @@ def scrape_enuygun(url: str, origin: str, destination: str, depart_date: str, re
                 "origin": origin,
                 "destination": destination,
                 "depart_date": depart_date,
-                "return_date": return_date,
                 "airline": airline,
                 "depart_time": dep_time,
                 "arrival_time": arr_time,
@@ -258,8 +255,7 @@ def main():
                 url=url,
                 origin=route["origin"],
                 destination=route["destination"],
-                depart_date=travel_date.isoformat(),
-                return_date=""
+                depart_date=travel_date.isoformat()
             )
 
             out = day_dir / f"{route['origin']}_{route['destination']}.json"

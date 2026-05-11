@@ -1,95 +1,105 @@
-# travel-price-tracker
-Location-based hotel and flight price tracking for data mining coursework.
+# ✈️ Travel Price Tracker
 
-# 🌍 Travel Price Tracker
-
-> Bu proje, **Veri Madenciliği** dersi kapsamında belirli bir rota ve tarih aralığı için otel ve uçak bileti fiyatlarının zaman içindeki değişimini takip etmeyi amaçlar.
-
-**Not:** Bu README proje başlangıç sürümüdür. Çıktı grafikleri ve sonuçlar veri toplama süreci ilerledikçe eklenecektir.
+> **Veri Madenciliği** dersi kapsamında, belirli rotalar ve tarih aralığı için uçak bileti fiyatlarının zaman içindeki değişimini takip eden ve ML tabanlı öneri sistemi geliştirmeyi hedefleyen bir projedir.
 
 ---
 
-## 🎯 Projenin Temel Hedefi
-* Düzenli aralıklarla fiyat verisi toplamak.
-* Verileri ortak bir şemada saklamak.
-* Zaman serisi mantığıyla fiyat değişimlerini analiz etmek.
-* Basit alarm/işaretleme kuralları oluşturmak (ör. fiyat düşüşü).
+## 🎯 Projenin Hedefi
 
-## 🔭 Proje Kapsamı (Başlangıç)
-Başlangıç aşamasında kapsam bilinçli olarak dar tutulmuştur. Amaç; önce çalışır bir MVP oluşturmak, sonra kapsamı genişletmektir.
-* **Uçuş:** 1-2 sabit rota (ör. İstanbul → Antalya)
-* **Otel:** 1 sabit bölge (ör. merkez nokta + yarıçap yaklaşımı)
-* **Zamanlama:** Günde 1 kez veya sınırlı periyotlarda veri toplama
-
-Uçuş verisi toplama tarafında ham çıktılar artık rota ve gün bazında ayrı JSON dosyaları olarak `data/raw/` altında saklanır. Örnek adlandırma: `flights_enuygun_20260501_IST_AYT.json`.
-
-## ⚖️ Etik ve Hukuki Çerçeve
-Web kazıma (web scraping) adımlarına geçmeden önce aşağıdaki ilkelere uyulur:
-* Hedef kaynakların kullanım koşulları (ToS) ve `robots.txt` kontrol edilir.
-* Kişisel veri toplanmaz (isim, e-posta vb. yok).
-* Sadece kamusal teklif/fiyat bilgileri işlenir.
-* Düşük frekanslı ve saygılı istek politikası uygulanır (rate limiting).
-* Gerekirse manuel örnekleme ve aynı analiz hattı ile devam edilir.
+* Enuygun.com'dan düzenli aralıklarla uçuş fiyat verisi toplamak
+* Verileri temizleyip ortak bir şemada saklamak
+* Özellik mühendisliği ile ML'e hazır dataset oluşturmak
+* Fiyat tahmini modeli eğitip "şimdi al / bekle" önerisi sunmak
 
 ---
 
-## 💾 Planlanan Veri Modeli
-Projede iki temel veri grubu bulunur:
+## 📊 Veri Kapsamı
 
-### 1. Otel Fiyat Kayıtları
-| Alan | Açıklama |
-| :--- | :--- |
-| `scrape_ts` | Kazıma zaman damgası |
-| `source` | Veri kaynağı (Platform adı vb.) |
-| `hotel_name` | Otel adı |
-| `lat`, `lng` | Koordinatlar veya adres |
-| `check_in`, `check_out` | Giriş ve çıkış tarihleri |
-| `price`, `currency` | Fiyat ve para birimi |
-| `rating` | Otel puanı (varsa) |
-| `raw_url` | İlanın ham linki |
-| `run_id` | Çalıştırma ID'si (Log takibi için) |
-
-### 2. Uçak Fiyat Kayıtları
-| Alan | Açıklama |
-| :--- | :--- |
-| `scrape_ts` | Kazıma zaman damgası |
-| `source` | Veri kaynağı |
-| `origin`, `destination` | Kalkış ve varış noktası |
-| `depart_date`, `return_date` | Gidiş ve dönüş tarihi (varsa) |
-| `airline` | Havayolu şirketi (varsa) |
-| `price`, `currency` | Fiyat ve para birimi |
-| `raw_url` | İlanın ham linki |
-| `run_id` | Çalıştırma ID'si |
+| Parametre | Değer |
+|-----------|-------|
+| **Kaynak** | Enuygun.com |
+| **Tarih Aralığı** | 01.05.2026 – 14.06.2026 |
+| **Rotalar** | IST↔AYT, SAW↔ESB, IST↔ADB (6 yön) |
+| **Toplam Kayıt** | ~8.707 uçuş |
+| **Özel Dönem** | Kurban Bayramı (27-30 Mayıs 2026) |
 
 ---
 
-## ⚙️ Mimari Akış (Plan)
-1. **Zamanlanmış Çalıştırma:** Scheduler (Cron vb.)
-2. **Veri Toplama:** Collector modülü
-3. **Ham Veri Kaydı:** `data/raw` içerisine JSON/CSV olarak yedekleme
-4. **Temizleme ve Doğrulama:** `src/clean`
-5. **Veritabanına Yazma:** `src/db`
-6. **Analiz:** `src/analysis` üzerinden zaman serisi işlemleri
-7. **Raporlama ve Görselleştirme:** `reports` (Grafikler, metrikler)
+## ⚙️ Pipeline
+
+```
+1. Veri Kazıma (Playwright)  →  data/raw/{YYYYMMDD}/{ORIGIN}_{DEST}.json
+2. Temizleme & Doğrulama     →  data/processed/flights_enuygun_clean.csv
+3. Özellik Mühendisliği      →  data/processed/flights_features.csv
+4. ML Model (TODO)           →  Fiyat tahmini & öneri
+```
 
 ---
 
 ## 📂 Klasör Yapısı
+
 ```text
 travel-price-tracker/
 ├─ src/
-│  ├─ collectors/     # Web scraping scriptleri
-│  ├─ clean/          # Veri temizleme ve normalizasyon
-│  ├─ db/             # Veritabanı bağlantı ve kayıt işlemleri
-│  └─ analysis/       # Fiyat analizleri ve alarmlar
+│  ├─ collectors/
+│  │  └─ flight_scraper_enuygun.py   # Playwright ile veri kazıma
+│  ├─ clean/
+│  │  └─ clean_flights_enuygun.py    # Ham JSON → temiz CSV
+│  └─ analysis/
+│     └─ feature_engineering.py      # Türetilmiş özellikler
 ├─ data/
-│  ├─ raw/            # Ham kazınmış veri (JSON/CSV)
-│  └─ processed/      # Temizlenmiş ve işlenmiş veri
-├─ reports/           # Çıktı grafikleri ve markdown raporları
-├─ .env.example       # Örnek çevre değişkenleri dosyası
-├─ requirements.txt   # Python bağımlılıkları
+│  ├─ raw/            # Ham JSON (gün/rota bazlı)
+│  └─ processed/      # Temizlenmiş CSV'ler
+├─ requirements.txt
 └─ README.md
 ```
+
 ---
+
+## 🚀 Kurulum & Çalıştırma
+
+```bash
+# Sanal ortam
+python -m venv .venv
+.venv\Scripts\activate
+
+# Bağımlılıklar
+pip install -r requirements.txt
+playwright install chromium
+
+# Pipeline adımları
+python src/collectors/flight_scraper_enuygun.py   # Veri kazıma
+python src/clean/clean_flights_enuygun.py         # Temizleme
+python src/analysis/feature_engineering.py        # Özellik üretimi
+```
+
+---
+
+## ⚖️ Etik ve Hukuki Çerçeve
+
+* Hedef kaynakların kullanım koşulları ve `robots.txt` kontrol edilmiştir
+* Kişisel veri toplanmaz
+* Sadece kamusal fiyat bilgileri işlenir
+* Düşük frekanslı ve saygılı istek politikası uygulanır (rate limiting + jitter)
+
+---
+
+## 📋 Türetilmiş Özellikler
+
+| Özellik | Açıklama |
+|---------|----------|
+| `days_to_flight` | Uçuşa kalan gün sayısı |
+| `depart_weekday` | Kalkış günü adı |
+| `is_weekend` | Hafta sonu mu? |
+| `time_of_day` | Saat dilimi (Sabah/Öğle/Akşam/Gece) |
+| `is_bayram` | Bayram günü mü? |
+| `days_to_bayram` | Bayrama kalan gün |
+| `bayram_period` | Normal / Pre-Bayram / Bayram / Post-Bayram |
+| `price_percentile` | Rota+saat kombinasyonuna göre fiyat yüzdeliği |
+| `is_price_outlier` | IQR tabanlı anomali flag'i |
+
+---
+
 ## Lisans
+
 Bu depo ders/akademik çalışma amaçlı hazırlanmıştır.

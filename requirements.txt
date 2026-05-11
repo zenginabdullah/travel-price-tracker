@@ -1,6 +1,7 @@
 pandas
+numpy
 matplotlib
+seaborn
 playwright
 scikit-learn
 xgboost
-streamlit
