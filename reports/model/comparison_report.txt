@@ -4,7 +4,7 @@ KARŞILAŞTIRMALI MODEL DEĞERLENDİRME RAPORU
 
 Problem: Regresyon (uçuş fiyat tahmini)
 Hedef: median_price (rota×gün bazında medyan uçuş fiyatı)
-Dataset: 270 satır, 22 feature
+Dataset: 270 satır, 33 feature
 Değerlendirme: 5-Fold Cross-Validation + Hold-out Test Set (%20)
 
 ────────────────────────────────────────────────────────────
@@ -13,23 +13,23 @@ KARŞILAŞTIRMA TABLOSU
 
   Metrik            XGBoost   Random Forest
   ──────────── ──────────── ───────────────
-  CV R²              0.7256          0.7255
-  Test R²            0.8329          0.6587
-  Test MAE            351 TL           463 TL
-  Test RMSE           490 TL           700 TL
-  Test MAPE           10.8%           13.6%
+  CV R²              0.7065          0.7128
+  Test R²            0.7529          0.6623
+  Test MAE            378 TL           465 TL
+  Test RMSE           596 TL           696 TL
+  Test MAPE           11.6%           13.6%
 
 ────────────────────────────────────────────────────────────
 SONUÇ VE YORUM
 ────────────────────────────────────────────────────────────
 
-  ★ En iyi model: XGBoost (CV R² = 0.7256)
-  • İki model arasındaki fark minimal (0.000).
+  ★ En iyi model: Random Forest (CV R² = 0.7128)
+  • İki model arasındaki fark minimal (0.006).
   • Her iki model de benzer performans gösteriyor.
 
   Güçlü Yönler:
     - Rota ve bayram dönemi etkisi başarıyla yakalanıyor
-    - Ortalama hata ±429 TL ile kabul edilebilir düzeyde
+    - Ortalama hata ±463 TL ile kabul edilebilir düzeyde
     - Overfitting kontrol altında (regularizasyon + CV)
 
   Zayıf Yönler / Sınırlılıklar:
