@@ -5,3 +5,6 @@ seaborn
 playwright
 scikit-learn
 xgboost
+optuna
+joblib
+streamlit
