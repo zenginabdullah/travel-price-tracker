@@ -1,0 +1,44 @@
+============================================================
+KARŞILAŞTIRMALI MODEL DEĞERLENDİRME RAPORU
+============================================================
+
+Problem: Regresyon (uçuş fiyat tahmini)
+Hedef: median_price (rota×gün bazında medyan uçuş fiyatı)
+Dataset: 270 satır, 22 feature
+Değerlendirme: 5-Fold Cross-Validation + Hold-out Test Set (%20)
+
+────────────────────────────────────────────────────────────
+KARŞILAŞTIRMA TABLOSU
+────────────────────────────────────────────────────────────
+
+  Metrik            XGBoost   Random Forest
+  ──────────── ──────────── ───────────────
+  CV R²              0.7256          0.7255
+  Test R²            0.8329          0.6587
+  Test MAE            351 TL           463 TL
+  Test RMSE           490 TL           700 TL
+  Test MAPE           10.8%           13.6%
+
+────────────────────────────────────────────────────────────
+SONUÇ VE YORUM
+────────────────────────────────────────────────────────────
+
+  ★ En iyi model: XGBoost (CV R² = 0.7256)
+  • İki model arasındaki fark minimal (0.000).
+  • Her iki model de benzer performans gösteriyor.
+
+  Güçlü Yönler:
+    - Rota ve bayram dönemi etkisi başarıyla yakalanıyor
+    - Ortalama hata ±429 TL ile kabul edilebilir düzeyde
+    - Overfitting kontrol altında (regularizasyon + CV)
+
+  Zayıf Yönler / Sınırlılıklar:
+    - Tek zaman diliminde (Mayıs-Haziran 2026) toplanan veri
+    - Dinamik fiyatlama ve talep bilgisi mevcut değil
+    - 270 aggregated satır ile sınırlı dataset boyutu
+
+  Gelecekte Yapılabilecek İyileştirmeler:
+    - Daha uzun tarih aralığında veri toplama (mevsimsellik)
+    - Aynı uçuşu farklı günlerde tekrar çekerek fiyat değişim trendi
+    - Tatil/etkinlik takvimi entegrasyonu
+    - Gerçek zamanlı fiyat takibi ile model güncelleme
