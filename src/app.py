@@ -3,6 +3,8 @@
 ========================================================
 Kullanıcı rota ve tarih seçer, model o gün için beklenen fiyatı tahmin eder.
 Kullanıcının gördüğü fiyatla karşılaştırıp "AL / BEKLE" önerisi verir.
+
+Yeni: Hava durumu bilgisi de gösterilir ve model feature'larına eklenmiştir.
 """
 
 import streamlit as st
@@ -16,6 +18,7 @@ from xgboost import XGBRegressor
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = PROJECT_ROOT / "models" / "xgb_price_model.json"
 FEATURES_CSV = PROJECT_ROOT / "data" / "processed" / "flights_features.csv"
+WEATHER_CSV = PROJECT_ROOT / "data" / "processed" / "weather_data.csv"
 
 # ─── Sabitler ─────────────────────────────────────────────────────────────────
 BAYRAM_START = date(2026, 5, 27)
@@ -30,6 +33,37 @@ ROUTES = {
     "İzmir → İstanbul": "ADB_IST",
     "İstanbul (SAW) → Ankara": "SAW_ESB",
     "Ankara → İstanbul (SAW)": "ESB_SAW",
+}
+
+# Rota -> varış şehri kodu eşlemesi (hava durumu için)
+ROUTE_DEST_CITY = {
+    "IST_AYT": "AYT",
+    "AYT_IST": "IST",
+    "IST_ADB": "ADB",
+    "ADB_IST": "IST",
+    "SAW_ESB": "ESB",
+    "ESB_SAW": "IST",
+}
+
+# Şehir isimleri
+CITY_NAMES = {
+    "IST": "İstanbul",
+    "AYT": "Antalya",
+    "ESB": "Ankara",
+    "ADB": "İzmir",
+}
+
+# Hava durumu emojileri
+WEATHER_EMOJIS = {
+    "Acik": "☀️",
+    "Az Bulutlu": "🌤️",
+    "Parcali Bulutlu": "⛅",
+    "Sisli": "🌫️",
+    "Ciseleme": "🌦️",
+    "Yagmurlu": "🌧️",
+    "Karli": "❄️",
+    "Firtinali": "🌩️",
+    "Bilinmiyor": "❓",
 }
 
 # Eğitim verisinden hesaplanan rota istatistikleri
@@ -61,19 +95,53 @@ def load_historical_data():
     return pd.DataFrame()
 
 
+@st.cache_data
+def load_weather_data():
+    """Hava durumu verisini yükle."""
+    if WEATHER_CSV.exists():
+        df = pd.read_csv(WEATHER_CSV)
+        df["date"] = pd.to_datetime(df["date"])
+        return df
+    return pd.DataFrame()
+
+
 # ─── Yardımcı Fonksiyonlar ───────────────────────────────────────────────────
 def classify_bayram_period(d: date) -> str:
     if BAYRAM_START <= d <= BAYRAM_END:
         return "Bayram"
     elif (BAYRAM_START - timedelta(days=PRE_BAYRAM_DAYS)) <= d < BAYRAM_START:
-        return "Pre-Bayram"
+        return "Bayram Oncesi"
     elif BAYRAM_END < d <= (BAYRAM_END + timedelta(days=POST_BAYRAM_DAYS)):
-        return "Post-Bayram"
+        return "Bayram Sonrasi"
     else:
         return "Normal"
 
 
-def build_features(route_code: str, depart_date: date) -> pd.DataFrame:
+def get_weather_for_date(weather_df: pd.DataFrame, city_code: str, target_date: date):
+    """Belirli bir şehir ve tarih için hava durumu bilgisini getir."""
+    if weather_df.empty:
+        return None
+    
+    match = weather_df[
+        (weather_df["city_code"] == city_code) & 
+        (weather_df["date"].dt.date == target_date)
+    ]
+    
+    if match.empty:
+        return None
+    
+    row = match.iloc[0]
+    return {
+        "temp_max": row["temp_max"],
+        "temp_min": row["temp_min"],
+        "precipitation": row["precipitation"],
+        "wind_speed": row["wind_speed"],
+        "condition": row["weather_condition"],
+        "is_bad": row["is_bad_weather"],
+    }
+
+
+def build_features(route_code: str, depart_date: date, weather_df: pd.DataFrame) -> pd.DataFrame:
     """Kullanıcı girdisinden model feature vektörü oluştur."""
     
     # Zaman feature'ları
@@ -96,36 +164,69 @@ def build_features(route_code: str, depart_date: date) -> pd.DataFrame:
 
     # Rota istatistikleri
     stats = ROUTE_STATS[route_code]
+    
+    # Hava durumu
+    dest_city = ROUTE_DEST_CITY[route_code]
+    weather_info = get_weather_for_date(weather_df, dest_city, depart_date)
+    
+    if weather_info:
+        temp_max = weather_info["temp_max"]
+        temp_min = weather_info["temp_min"]
+        precipitation = weather_info["precipitation"]
+        wind_speed = weather_info["wind_speed"]
+        weather_condition = weather_info["condition"]
+        is_bad_weather = weather_info["is_bad"]
+    else:
+        # Hava durumu yoksa en yaygın değerler
+        temp_max = 20.0
+        temp_min = 10.0
+        precipitation = 0.0
+        wind_speed = 10.0
+        weather_condition = "Acik"
+        is_bad_weather = 0
 
-    # Feature vektörü (sıralama ML dataset ile aynı olmalı)
-    features = {
-        "days_to_flight": days_to_flight,
-        "depart_weekday": depart_weekday,
-        "is_weekend": is_weekend,
-        "day_of_month": day_of_month,
-        "week_of_month": week_of_month,
-        "is_bayram": is_bayram,
-        "days_to_bayram": days_to_bayram,
-        "bayram_proximity": bayram_proximity,
-        "flight_count": stats["avg_flights"],
-        "airline_count": stats["avg_airlines"],
-        "route_global_avg": stats["global_avg"],
-        "route_global_std": stats["global_std"],
+    # Feature vektörü - model feature_names sırasına göre (34 feature)
+    features = [
+        ("days_to_flight", days_to_flight),
+        ("depart_weekday", depart_weekday),
+        ("is_weekend", is_weekend),
+        ("day_of_month", day_of_month),
+        ("week_of_month", week_of_month),
+        ("is_bayram", is_bayram),
+        ("days_to_bayram", days_to_bayram),
+        ("bayram_proximity", bayram_proximity),
+        ("flight_count", stats["avg_flights"]),
+        ("airline_count", stats["avg_airlines"]),
+        ("route_global_avg", stats["global_avg"]),
+        ("route_global_std", stats["global_std"]),
+        # Hava durumu (model sırasında route'lardan önce)
+        ("temp_max", temp_max),
+        ("temp_min", temp_min),
+        ("precipitation", precipitation),
+        ("wind_speed", wind_speed),
+        ("is_bad_weather", is_bad_weather),
         # Route one-hot
-        "route_ADB_IST": 1 if route_code == "ADB_IST" else 0,
-        "route_AYT_IST": 1 if route_code == "AYT_IST" else 0,
-        "route_ESB_SAW": 1 if route_code == "ESB_SAW" else 0,
-        "route_IST_ADB": 1 if route_code == "IST_ADB" else 0,
-        "route_IST_AYT": 1 if route_code == "IST_AYT" else 0,
-        "route_SAW_ESB": 1 if route_code == "SAW_ESB" else 0,
-        # Bayram period one-hot
-        "bayram_period_Bayram": 1 if bayram_period == "Bayram" else 0,
-        "bayram_period_Normal": 1 if bayram_period == "Normal" else 0,
-        "bayram_period_Post-Bayram": 1 if bayram_period == "Post-Bayram" else 0,
-        "bayram_period_Pre-Bayram": 1 if bayram_period == "Pre-Bayram" else 0,
-    }
+        ("route_ADB_IST", 1 if route_code == "ADB_IST" else 0),
+        ("route_AYT_IST", 1 if route_code == "AYT_IST" else 0),
+        ("route_ESB_SAW", 1 if route_code == "ESB_SAW" else 0),
+        ("route_IST_ADB", 1 if route_code == "IST_ADB" else 0),
+        ("route_IST_AYT", 1 if route_code == "IST_AYT" else 0),
+        ("route_SAW_ESB", 1 if route_code == "SAW_ESB" else 0),
+        # Bayram period one-hot (alfabetik sıra: Bayram, Bayram Oncesi, Bayram Sonrasi, Normal)
+        ("bayram_period_Bayram", 1 if bayram_period == "Bayram" else 0),
+        ("bayram_period_Bayram Oncesi", 1 if bayram_period == "Bayram Oncesi" else 0),
+        ("bayram_period_Bayram Sonrasi", 1 if bayram_period == "Bayram Sonrasi" else 0),
+        ("bayram_period_Normal", 1 if bayram_period == "Normal" else 0),
+        # Weather condition one-hot
+        ("weather_condition_Acik", 1 if weather_condition == "Acik" else 0),
+        ("weather_condition_Ciseleme", 1 if weather_condition == "Ciseleme" else 0),
+        ("weather_condition_Firtinali", 1 if weather_condition == "Firtinali" else 0),
+        ("weather_condition_Karli", 1 if weather_condition == "Karli" else 0),
+        ("weather_condition_Sisli", 1 if weather_condition == "Sisli" else 0),
+        ("weather_condition_Yagmurlu", 1 if weather_condition == "Yagmurlu" else 0),
+    ]
 
-    return pd.DataFrame([features])
+    return pd.DataFrame([dict(features)])
 
 
 def get_recommendation(user_price: float, predicted_price: float, bayram_period: str):
@@ -168,6 +269,7 @@ if not MODEL_PATH.exists():
 
 model = load_model()
 hist_df = load_historical_data()
+weather_df = load_weather_data()
 
 # ─── Kullanıcı Girdileri ─────────────────────────────────────────────────────
 col1, col2, col3 = st.columns([2, 2, 2])
@@ -193,12 +295,29 @@ with col3:
         step=100,
     )
 
+# ─── Hava Durumu Önizleme ────────────────────────────────────────────────────
+if not weather_df.empty:
+    dest_city = ROUTE_DEST_CITY[route_code]
+    weather_info = get_weather_for_date(weather_df, dest_city, selected_date)
+    
+    if weather_info:
+        emoji = WEATHER_EMOJIS.get(weather_info["condition"], "❓")
+        city_name = CITY_NAMES.get(dest_city, dest_city)
+        
+        st.markdown(
+            f"🌤️ **{city_name} Hava Durumu:** "
+            f"{emoji} {weather_info['condition']}, "
+            f"{weather_info['temp_max']:.0f}°C / {weather_info['temp_min']:.0f}°C, "
+            f"💧 {weather_info['precipitation']:.1f}mm, "
+            f"💨 {weather_info['wind_speed']:.0f} km/h"
+        )
+
 # ─── Tahmin ve Öneri ─────────────────────────────────────────────────────────
 if st.button("🔍 Analiz Et", type="primary", use_container_width=True):
     st.divider()
 
     # Feature oluştur ve tahmin yap
-    features_df = build_features(route_code, selected_date)
+    features_df = build_features(route_code, selected_date, weather_df)
     predicted_price = model.predict(features_df)[0]
     bayram_period = classify_bayram_period(selected_date)
 
@@ -235,7 +354,7 @@ if st.button("🔍 Analiz Et", type="primary", use_container_width=True):
     # ─── Ek Bilgiler ─────────────────────────────────────────────────────────
     st.divider()
 
-    info_col1, info_col2 = st.columns(2)
+    info_col1, info_col2, info_col3 = st.columns(3)
 
     with info_col1:
         st.subheader("📈 Bu Rota Hakkında")
@@ -253,10 +372,35 @@ if st.button("🔍 Analiz Et", type="primary", use_container_width=True):
         st.write(f"**Dönem:** {bayram_period}")
         if bayram_period == "Bayram":
             st.warning("⚠️ Kurban Bayramı dönemi! Fiyatlar normalden ~%47 daha yüksek.")
-        elif bayram_period == "Pre-Bayram":
+        elif bayram_period == "Bayram Oncesi":
             st.info("📌 Bayram öncesi dönem. Fiyatlar yükselmeye başlamış olabilir.")
-        elif bayram_period == "Post-Bayram":
+        elif bayram_period == "Bayram Sonrasi":
             st.info("📌 Bayram sonrası dönem. Fiyatlar normale dönüyor.")
+
+    with info_col3:
+        st.subheader("🌤️ Hava Durumu")
+        if not weather_df.empty:
+            dest_city = ROUTE_DEST_CITY[route_code]
+            weather_info = get_weather_for_date(weather_df, dest_city, selected_date)
+            
+            if weather_info:
+                emoji = WEATHER_EMOJIS.get(weather_info["condition"], "❓")
+                city_name = CITY_NAMES.get(dest_city, dest_city)
+                
+                st.write(f"**Şehir:** {city_name}")
+                st.write(f"**Durum:** {emoji} {weather_info['condition']}")
+                st.write(f"**Sıcaklık:** {weather_info['temp_max']:.0f}°C / {weather_info['temp_min']:.0f}°C")
+                st.write(f"**Yağış:** {weather_info['precipitation']:.1f} mm")
+                st.write(f"**Rüzgar:** {weather_info['wind_speed']:.0f} km/h")
+                
+                if weather_info["is_bad"]:
+                    st.warning("⚠️ Kötü hava koşulu! Fiyatlar etkilenebilir.")
+                elif weather_info["condition"] == "Acik":
+                    st.success("✅ Güzel hava! Tatil rotalarında talep artabilir.")
+            else:
+                st.write("Bu tarih için hava durumu verisi bulunamadı.")
+        else:
+            st.write("Hava durumu verisi yüklenemedi.")
 
     # ─── Geçmiş Veri Grafiği ─────────────────────────────────────────────────
     if not hist_df.empty:
@@ -299,8 +443,9 @@ st.sidebar.header("ℹ️ Sistem Bilgisi")
 st.sidebar.markdown("""
 **Model:** XGBoost Regresyon  
 **Eğitim Verisi:** 6 rota, 45 gün (~9K uçuş)  
-**Performans:** R² = 0.80, MAE = ±400 TL  
+**Performans:** R² = 0.75, MAE = ±442 TL  
 **Veri Kaynağı:** Enuygun.com  
+**Hava Durumu:** Open-Meteo API  
 """)
 
 st.sidebar.divider()
@@ -309,7 +454,8 @@ st.sidebar.markdown("""
 1. Rota ve tarih seçin
 2. Gördüğünüz bilet fiyatını girin
 3. Model o gün için beklenen fiyatı tahmin eder
-4. Fiyatınız tahmine göre ucuz/pahalı mı değerlendirilir
+4. Hava durumu da dikkate alınır
+5. Fiyatınız tahmine göre ucuz/pahalı mı değerlendirilir
 """)
 
 st.sidebar.divider()
