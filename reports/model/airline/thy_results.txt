@@ -1,0 +1,29 @@
+=======================================================
+Havayolu: THY
+=======================================================
+Veri: 4,333 ucus kaydı
+Tarih: 2026-05-01 - 2026-07-15
+
+XGBoost:
+  CV R2:  0.6266 +/- 0.0492
+  CV MAE: 379 +/- 35 TL
+  Test R2: 0.5582  MAE: 405 TL  MAPE: 12.7%
+  Params: {'n_estimators': 317, 'max_depth': 7, 'learning_rate': 0.025853859154563796, 'subsample': 0.8947985576986394, 'colsample_bytree': 0.7204635785030464, 'reg_alpha': 1.8035646557694527, 'reg_lambda': 7.593327049832748, 'min_child_weight': 10, 'gamma': 2.1529383106551667}
+
+Random Forest:
+  CV R2:  0.6548 +/- 0.0521
+  CV MAE: 366 +/- 41 TL
+  Test R2: 0.5651  MAE: 407 TL  MAPE: 13.0%
+  Params: {'n_estimators': 227, 'max_depth': 20, 'min_samples_leaf': 1, 'max_features': 0.5003443716292508}
+
+Top 10 Feature (XGBoost):
+  bayram_period_Bayram_Oncesi         0.1929
+  days_to_flight                      0.1445
+  month                               0.0757
+  route_global_std                    0.0565
+  bayram_period_Normal                0.0540
+  route_AYT_IST                       0.0486
+  route_global_avg                    0.0478
+  route_ADB_IST                       0.0442
+  flight_count                        0.0411
+  temp_min                            0.0371

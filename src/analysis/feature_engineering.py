@@ -218,7 +218,7 @@ def create_aggregated_ml_dataset(df: pd.DataFrame) -> pd.DataFrame:
     agg_df["price_iqr"] = agg_df["q75_price"] - agg_df["q25_price"]
 
     # ─── Rota bazlı global istatistikler ─────────────────────────────────────
-    route_global = agg_df.groupby("route")["median_price"].agg(["mean", "std"]).rename(
+    route_global = agg_df.groupby("route")["min_price"].agg(["mean", "std"]).rename(
         columns={"mean": "route_global_avg", "std": "route_global_std"}
     )
     agg_df = agg_df.merge(route_global, on="route", how="left")
@@ -232,7 +232,7 @@ def create_aggregated_ml_dataset(df: pd.DataFrame) -> pd.DataFrame:
     # ─── ML-ready format ─────────────────────────────────────────────────────
     ml_features = [
         # Hedef
-        "median_price",
+        "min_price",
         # Zaman
         "days_to_flight",
         "depart_weekday",
@@ -298,9 +298,9 @@ def main():
 
     # Özet
     print(f"\n[OK] Tamamlandı!")
-    print(f"     Hedef değişken: median_price")
+    print(f"     Hedef değişken: min_price")
     print(f"     Feature sayısı: {len(df_ml.columns) - 1}")
-    print(f"     Medyan fiyat aralığı: {df_ml['median_price'].min():.0f} - {df_ml['median_price'].max():.0f} TL")
+    print(f"     Min fiyat aralığı: {df_ml['min_price'].min():.0f} - {df_ml['min_price'].max():.0f} TL")
     
     # Hava durumu feature'larının varlığını kontrol et
     weather_cols = [c for c in df_ml.columns if any(w in c for w in 

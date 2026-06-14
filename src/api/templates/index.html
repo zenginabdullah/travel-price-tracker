@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="tr" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TPT for Flights – Fiyat Tahmin Sistemi</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { brand: { DEFAULT: '#2563EB', dark: '#1D4ED8' } } } }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+  <style>
+    #progress-wrap { display: none; }
+  </style>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<div class="flex h-screen overflow-hidden">
+
+  <!-- ── Sidebar ── -->
+  <aside class="w-52 bg-white border-r border-slate-200 flex flex-col shrink-0">
+    <div class="px-5 py-5 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white text-lg">✈</div>
+        <div>
+          <div class="font-bold text-slate-800 leading-tight">TPT for Flights</div>
+          <div class="text-xs text-slate-400">Fiyat Tahmin Sistemi</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <button onclick="scrollTo('top')"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-50 text-brand cursor-pointer">
+        <span>🏠</span> Ana Sayfa
+      </button>
+      <button onclick="document.getElementById('form-section').scrollIntoView({behavior:'smooth'})"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-brand transition-colors cursor-pointer">
+        <span>🔮</span> Tahmin Yap
+      </button>
+      <button onclick="document.getElementById('forecast-panel') && document.getElementById('forecast-panel').scrollIntoView({behavior:'smooth'})"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-brand transition-colors cursor-pointer">
+        <span>📅</span> Fiyat Takvimi
+      </button>
+      <button onclick="document.getElementById('result-section') && document.getElementById('result-section').scrollIntoView({behavior:'smooth'})"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-brand transition-colors cursor-pointer">
+        <span>📊</span> Sonuçlar
+      </button>
+      <a href="/about"
+        class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-brand transition-colors">
+        <span>ℹ️</span> Hakkımızda
+      </a>
+    </nav>
+
+    <div class="px-4 py-4 border-t border-slate-100">
+      <div class="bg-blue-50 rounded-xl p-3 text-xs text-slate-500 space-y-1">
+        <p class="font-semibold text-slate-700">Doğru zamanda,<br/>en uygun fiyatla uçun.</p>
+        <p>Yapay zeka destekli tahmin modelimiz uçuş fiyatlarını analiz ediyor.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="flex-1 overflow-y-auto">
+    <div class="max-w-5xl mx-auto px-6 py-8 space-y-8">
+
+      <div id="top">
+        <h1 class="text-2xl font-bold text-slate-800">Yeni Fiyat Tahmini</h1>
+        <p class="text-slate-500 mt-1">Gördüğünüz bilet fiyatını girin, modelimiz size öneride bulunsun.</p>
+      </div>
+
+      <!-- ── Form ── -->
+      <div id="form-section">
+        <form
+          hx-post="/predict"
+          hx-target="#result-section"
+          hx-swap="innerHTML"
+          class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6"
+        >
+          <!-- Hidden field carrying the derived route code -->
+          <input type="hidden" name="route" id="route-hidden" value="IST_AYT" />
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+
+            <!-- Origin -->
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Kalkış Noktası</label>
+              <div class="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
+                <span class="text-brand text-base">✈</span>
+                <select id="origin-select" onchange="onOriginChange()"
+                  class="bg-transparent font-semibold text-slate-700 text-sm outline-none w-full cursor-pointer">
+                  <option value="IST">İstanbul (IST)</option>
+                  <option value="AYT">Antalya (AYT)</option>
+                  <option value="ADB">İzmir (ADB)</option>
+                  <option value="SAW">İstanbul (SAW)</option>
+                  <option value="ESB">Ankara (ESB)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Destination -->
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Varış Noktası</label>
+              <div class="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
+                <span class="text-brand text-base">✈</span>
+                <select id="dest-select" onchange="onDestChange()"
+                  class="bg-transparent font-semibold text-slate-700 text-sm outline-none w-full cursor-pointer">
+                </select>
+              </div>
+            </div>
+
+            <!-- Airline -->
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Havayolu</label>
+              <div class="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
+                <span class="text-slate-400">🏢</span>
+                <select name="airline" id="airline-select"
+                  class="bg-transparent font-semibold text-slate-700 text-sm outline-none w-full cursor-pointer">
+                  <option value="">En Uygun (Tümü)</option>
+                  {% for a in airlines %}
+                  <option value="{{ a }}">{{ a }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <!-- Date -->
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Gidiş Tarihi</label>
+              <div class="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
+                <span class="text-slate-400">📅</span>
+                <input type="date" name="depart_date" id="depart-date"
+                  value="{{ today }}" min="{{ min_date }}" max="{{ max_date }}"
+                  class="bg-transparent font-semibold text-slate-700 text-sm outline-none w-full" />
+              </div>
+            </div>
+
+            <!-- Price -->
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Gördüğünüz Bilet Fiyatı</label>
+              <div class="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
+                <input type="number" name="user_price" value="3500" min="500" max="20000" step="50"
+                  class="bg-transparent font-bold text-slate-800 text-sm outline-none w-full" placeholder="3500" />
+                <span class="text-slate-500 text-sm shrink-0">TL</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 flex items-center gap-3">
+            <button type="submit" id="submit-btn"
+              class="bg-brand hover:bg-brand-dark text-white font-semibold px-8 py-3 rounded-xl flex items-center gap-2 transition-colors shadow-sm">
+              <span>📈</span> Tahmin Yap
+            </button>
+            <span id="route-warning" class="hidden text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg font-medium"></span>
+          </div>
+
+          <!-- Progress bar — JS ile göster/gizle -->
+          <div id="progress-wrap" class="mt-4">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-medium text-brand" id="progress-label">Model hesaplıyor…</span>
+              <span class="text-xs text-slate-400" id="progress-pct">0%</span>
+            </div>
+            <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+              <div id="progress-bar"
+                class="h-full bg-gradient-to-r from-brand to-blue-400 rounded-full transition-all duration-300"
+                style="width: 0%">
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-1" id="progress-sub">Havayolu modelleri yükleniyor…</p>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── Result (HTMX target) ── -->
+      <div id="result-section">
+        <div class="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center text-slate-400">
+          <div class="text-5xl mb-3">✈️</div>
+          <p class="font-medium">Rota ve tarihi seçin, fiyatı girin, tahminizi alın.</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Tüm geçerli rotalar: { "IST_AYT": true, ... }
+  const ALL_ROUTES = {
+    "IST_AYT": true, "AYT_IST": true,
+    "IST_ADB": true, "ADB_IST": true,
+    "SAW_ESB": true, "ESB_SAW": true,
+  };
+
+  const CITY_LABELS = {
+    "IST": "İstanbul (IST)", "AYT": "Antalya (AYT)",
+    "ADB": "İzmir (ADB)",   "SAW": "İstanbul (SAW)", "ESB": "Ankara (ESB)",
+  };
+
+  // origin → [dest] lookup
+  const DEST_BY_ORIGIN = {};
+  for (const code of Object.keys(ALL_ROUTES)) {
+    const [src, dst] = code.split("_");
+    if (!DEST_BY_ORIGIN[src]) DEST_BY_ORIGIN[src] = [];
+    DEST_BY_ORIGIN[src].push(dst);
+  }
+
+  function populateDests(origin, selectedDest) {
+    const destSel = document.getElementById("dest-select");
+    const dests = DEST_BY_ORIGIN[origin] || [];
+    destSel.innerHTML = dests.map(code =>
+      `<option value="${code}" ${code === selectedDest ? "selected" : ""}>${CITY_LABELS[code]}</option>`
+    ).join("");
+    updateRoute();
+  }
+
+  function updateRoute() {
+    const origin = document.getElementById("origin-select").value;
+    const dest   = document.getElementById("dest-select").value;
+    const code   = origin + "_" + dest;
+    document.getElementById("route-hidden").value = code;
+  }
+
+  function onOriginChange() {
+    const origin = document.getElementById("origin-select").value;
+    const dests = DEST_BY_ORIGIN[origin] || [];
+    populateDests(origin, dests[0] || null);
+  }
+
+  function onDestChange() {
+    updateRoute();
+  }
+
+  // Init
+  populateDests("IST", "AYT");
+
+  // ── Progress bar ───────────────────────────────────────────────────────────
+  // Her adım ~1.6s → 8 adım × 1600ms = ~13s, sonra gerçek cevap gelince %100
+  const PROGRESS_STEPS = [
+    { pct: 5,  label: "Model hesaplıyor…",           sub: "Feature vektörü oluşturuluyor…" },
+    { pct: 14, label: "Model hesaplıyor…",           sub: "Pegasus modeli tahmin yapıyor…" },
+    { pct: 25, label: "Model hesaplıyor…",           sub: "AJet modeli tahmin yapıyor…" },
+    { pct: 37, label: "Model hesaplıyor…",           sub: "THY modeli tahmin yapıyor…" },
+    { pct: 50, label: "Tahmin analiz ediliyor…",     sub: "Alternatif tarihler hesaplanıyor…" },
+    { pct: 63, label: "Grafik verisi hazırlanıyor…", sub: "Haftalık tahminler üretiliyor…" },
+    { pct: 75, label: "Grafik verisi hazırlanıyor…", sub: "Fiyat geçmişi yükleniyor…" },
+    { pct: 85, label: "Sonuçlar işleniyor…",         sub: "Hava durumu verileri ekleniyor…" },
+    { pct: 92, label: "Sonuçlar işleniyor…",         sub: "Sayfa oluşturuluyor…" },
+  ];
+
+  let _progressTimer = null;
+  let _stepIdx = 0;
+
+  function setProgress(pct, label, sub) {
+    document.getElementById("progress-bar").style.width = pct + "%";
+    document.getElementById("progress-pct").textContent  = pct + "%";
+    if (label) document.getElementById("progress-label").textContent = label;
+    if (sub)   document.getElementById("progress-sub").textContent   = sub;
+  }
+
+  function startProgress() {
+    document.getElementById("progress-wrap").style.display = "block";
+    _stepIdx = 0;
+    setProgress(0, "Model hesaplıyor…", "İstek gönderiliyor…");
+    _progressTimer = setInterval(() => {
+      if (_stepIdx >= PROGRESS_STEPS.length) return;
+      const s = PROGRESS_STEPS[_stepIdx++];
+      setProgress(s.pct, s.label, s.sub);
+    }, 1600);
+  }
+
+  function finishProgress() {
+    clearInterval(_progressTimer);
+    setProgress(100, "Tamamlandı!", "Sonuçlar yüklendi.");
+    setTimeout(() => {
+      document.getElementById("progress-wrap").style.display = "none";
+    }, 800);
+  }
+
+  document.body.addEventListener("htmx:beforeRequest", startProgress);
+  document.body.addEventListener("htmx:afterSwap",     finishProgress);
+  document.body.addEventListener("htmx:responseError", () => {
+    clearInterval(_progressTimer);
+    setProgress(0, "Hata oluştu", "Lütfen tekrar deneyin.");
+    setTimeout(() => {
+      document.getElementById("progress-wrap").style.display = "none";
+    }, 2000);
+  });
+</script>
+</body>
+</html>

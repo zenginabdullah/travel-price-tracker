@@ -1,59 +1,48 @@
 ============================================================
-EDA ÖZET RAPORU
+EDA OZET RAPORU
 ============================================================
 
-📊 Dataset: 8707 satır, 31 sütun
-📅 Tarih aralığı: 2026-05-01 → 2026-06-14
-✈️  Rota sayısı: 6
-🛫 Havayolu sayısı: 3
+Dataset : 15,791 satir, 30 sutun
+Tarih   : 2026-05-01 - 2026-07-15
+Rota    : 6
+Havayolu: 3
 
 ────────────────────────────────────────────────────────────
-FİYAT İSTATİSTİKLERİ
+FIYAT ISTATISTIKLERI
 ────────────────────────────────────────────────────────────
-  Min:      1,049 TL
-  Q1:       2,490 TL
-  Medyan:   3,710 TL
-  Ortalama: 3,852 TL
-  Q3:       4,754 TL
-  Max:      15,973 TL
-  Std:      1,892 TL
+  Min      :    1,049 TL
+  Q1       :    2,438 TL
+  Medyan   :    3,581 TL
+  Ortalama :    3,902 TL
+  Q3       :    4,755 TL
+  Max      :   19,136 TL
+  Std      :    2,034 TL
 
 ────────────────────────────────────────────────────────────
-BAYRAM ETKİSİ
+HAVAYOLU BAZLI
 ────────────────────────────────────────────────────────────
-  Normal       → Medyan: 3,222 TL | Ort: 3,515 TL | N=5181
-  Pre-Bayram   → Medyan: 4,563 TL | Ort: 4,443 TL | N=1410
-  Bayram       → Medyan: 4,754 TL | Ort: 4,741 TL | N=772
-  Post-Bayram  → Medyan: 3,912 TL | Ort: 4,019 TL | N=1344
-
-  ⚠️  Bayram fiyat artışı: %47.5 (medyan bazlı)
+  AJet       Medyan:  3,712 TL  Min:  1,049 TL  N=6,166
+  Pegasus    Medyan:  2,495 TL  Min:  1,477 TL  N=5,049
+  THY        Medyan:  3,912 TL  Min:  2,130 TL  N=4,576
 
 ────────────────────────────────────────────────────────────
-PRICE İLE EN YÜKSEK KORELASYONLAR
+BAYRAM ETKISI
 ────────────────────────────────────────────────────────────
-  route_avg_price      → +0.334
-  airline_avg_price    → +0.288
-  day_of_month         → +0.230
-  days_to_bayram       → -0.226
-  days_to_flight       → +0.199
-  is_weekend           → +0.169
-  depart_weekday       → +0.169
-  is_bayram            → +0.147
-  depart_hour          → +0.050
+  Normal           Medyan:  3,383 TL  N=12,265
+  Bayram Oncesi    Medyan:  4,563 TL  N=1,410
+  Bayram           Medyan:  4,754 TL  N=772
+  Bayram Sonrasi   Medyan:  3,912 TL  N=1,344
+
+  Bayram fiyat artisi: %40.5 (medyan bazli)
 
 ────────────────────────────────────────────────────────────
-ROTA BAZLI MEDYAN FİYATLAR
+PRICE KORELASYONLARI (top 8)
 ────────────────────────────────────────────────────────────
-  IST_AYT      → 4,249 TL
-  AYT_IST      → 3,912 TL
-  ADB_IST      → 3,712 TL
-  IST_ADB      → 3,538 TL
-  ESB_SAW      → 2,005 TL
-  SAW_ESB      → 1,855 TL
-
-────────────────────────────────────────────────────────────
-HAVAYOLU BAZLI MEDYAN FİYATLAR
-────────────────────────────────────────────────────────────
-  THY          → 3,912 TL
-  AJet         → 3,710 TL
-  Pegasus      → 2,961 TL
+  days_to_flight            +0.200
+  is_weekend                +0.153
+  depart_weekday            +0.137
+  depart_hour               +0.103
+  is_bayram                 +0.094
+  temp_max                  +0.051
+  day_of_month              +0.041
+  days_to_bayram            +0.028

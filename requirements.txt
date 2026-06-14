@@ -9,3 +9,7 @@ optuna
 joblib
 streamlit
 requests
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
