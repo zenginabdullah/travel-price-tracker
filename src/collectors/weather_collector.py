@@ -37,7 +37,7 @@ CITIES = {
 # ─── Tarih Aralığı ───────────────────────────────────────────────────────────
 # Projedeki uçuş verilerinin tarih aralığı
 START_DATE = date(2026, 5, 1)
-END_DATE = date(2026, 6, 14)
+END_DATE = date(2026, 7, 15)
 
 # ─── Hava Durumu Kodu Sınıflandırma ──────────────────────────────────────────
 # Open-Meteo WMO weather codes

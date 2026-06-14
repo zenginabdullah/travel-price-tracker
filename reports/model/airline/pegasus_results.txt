@@ -1,0 +1,29 @@
+=======================================================
+Havayolu: Pegasus
+=======================================================
+Veri: 4,995 ucus kaydı
+Tarih: 2026-05-01 - 2026-07-15
+
+XGBoost:
+  CV R2:  0.6587 +/- 0.0779
+  CV MAE: 241 +/- 31 TL
+  Test R2: 0.6739  MAE: 200 TL  MAPE: 9.8%
+  Params: {'n_estimators': 312, 'max_depth': 6, 'learning_rate': 0.017148100498507252, 'subsample': 0.9154349684237224, 'colsample_bytree': 0.5485481669814966, 'reg_alpha': 3.551493743551587, 'reg_lambda': 5.653970910503066, 'min_child_weight': 4, 'gamma': 1.386112593164721}
+
+Random Forest:
+  CV R2:  0.6561 +/- 0.0698
+  CV MAE: 242 +/- 27 TL
+  Test R2: 0.6329  MAE: 213 TL  MAPE: 10.6%
+  Params: {'n_estimators': 131, 'max_depth': 10, 'min_samples_leaf': 1, 'max_features': 0.5350676366118762}
+
+Top 10 Feature (XGBoost):
+  bayram_period_Normal                0.1591
+  days_to_flight                      0.0950
+  route_ESB_SAW                       0.0807
+  route_IST_AYT                       0.0669
+  route_global_avg                    0.0626
+  week_of_month                       0.0509
+  route_global_std                    0.0483
+  days_to_bayram                      0.0434
+  day_of_month                        0.0385
+  bayram_proximity                    0.0365

@@ -1,0 +1,29 @@
+=======================================================
+Havayolu: AJet
+=======================================================
+Veri: 5,980 ucus kaydı
+Tarih: 2026-05-01 - 2026-07-15
+
+XGBoost:
+  CV R2:  0.5945 +/- 0.1087
+  CV MAE: 309 +/- 51 TL
+  Test R2: 0.6216  MAE: 254 TL  MAPE: 13.8%
+  Params: {'n_estimators': 548, 'max_depth': 6, 'learning_rate': 0.040071798235734986, 'subsample': 0.8565648081260672, 'colsample_bytree': 0.7133212243722056, 'reg_alpha': 0.517762581924613, 'reg_lambda': 1.8754022150506924, 'min_child_weight': 3, 'gamma': 0.795205778459708}
+
+Random Forest:
+  CV R2:  0.6333 +/- 0.0758
+  CV MAE: 297 +/- 54 TL
+  Test R2: 0.6522  MAE: 255 TL  MAPE: 13.9%
+  Params: {'n_estimators': 217, 'max_depth': 12, 'min_samples_leaf': 1, 'max_features': 0.4684275802242399}
+
+Top 10 Feature (XGBoost):
+  bayram_period_Normal                0.3726
+  days_to_flight                      0.0746
+  route_global_avg                    0.0485
+  bayram_proximity                    0.0407
+  bayram_period_Bayram                0.0370
+  is_weekend                          0.0369
+  week_of_month                       0.0362
+  route_global_std                    0.0358
+  route_IST_AYT                       0.0311
+  month                               0.0298

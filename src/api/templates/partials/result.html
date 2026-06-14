@@ -1,0 +1,377 @@
+{% set status_styles = {
+  "buy":      {"bg": "bg-emerald-50",  "border": "border-emerald-200", "icon_bg": "bg-emerald-500", "text": "text-emerald-700", "badge": "bg-emerald-100 text-emerald-700"},
+  "wait":     {"bg": "bg-amber-50",    "border": "border-amber-200",   "icon_bg": "bg-amber-500",   "text": "text-amber-700",   "badge": "bg-amber-100 text-amber-700"},
+  "expensive":{"bg": "bg-red-50",      "border": "border-red-200",     "icon_bg": "bg-red-500",     "text": "text-red-700",     "badge": "bg-red-100 text-red-700"},
+} %}
+{% set s = status_styles[status] %}
+
+<!-- Top row: Öneri + Özet + Ne Yapmalıyım -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+  <!-- Model Önerisi -->
+  <div class="{{ s.bg }} {{ s.border }} border rounded-2xl p-5 space-y-3">
+    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Model Önerisi</p>
+    <div class="flex items-center gap-3">
+      <div class="{{ s.icon_bg }} w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0">
+        {% if status == "buy" %}📈{% elif status == "wait" %}⏸{% else %}⚠️{% endif %}
+      </div>
+      <div>
+        <p class="text-lg font-bold {{ s.text }}">{{ label }}</p>
+        <p class="text-xs text-slate-500">{{ explanation }}</p>
+      </div>
+    </div>
+    <div class="text-xs text-slate-500 bg-white/60 rounded-lg px-3 py-2">
+      Tahmin güven aralığı:
+      <span class="font-semibold text-slate-700">
+        {{ "{:,.0f}".format(predicted * 0.88) }} TL – {{ "{:,.0f}".format(predicted * 1.12) }} TL
+      </span>
+    </div>
+  </div>
+
+  <!-- Tahmin Özeti -->
+  <div class="bg-white border border-slate-100 rounded-2xl p-5 space-y-2 shadow-sm">
+    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tahmin Özeti</p>
+    <div class="space-y-1.5 text-sm">
+      <div class="flex justify-between">
+        <span class="text-slate-500">Şu Anki Fiyatınız</span>
+        <span class="font-semibold text-slate-800">{{ "{:,.0f}".format(user_price) }} TL</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-500">Tahmini En Uygun Fiyat</span>
+        <span class="font-semibold text-emerald-600">{{ "{:,.0f}".format(predicted) }} TL</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-500">Fiyat Farkı</span>
+        <span class="font-semibold {% if diff_pct > 0 %}text-red-600{% else %}text-emerald-600{% endif %}">
+          %{{ "{:+.0f}".format(diff_pct) }}
+        </span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-500">Dönem</span>
+        <span class="font-semibold text-slate-700">{{ period }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ne Yapmalıyım? -->
+  <div class="bg-white border border-slate-100 rounded-2xl p-5 space-y-3 shadow-sm">
+    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ne Yapmalıyım?</p>
+    <div class="space-y-2 text-xs">
+      <div class="flex items-start gap-2 bg-amber-50 rounded-lg p-2.5">
+        <span class="mt-0.5">🛒</span>
+        <div>
+          <p class="font-semibold text-amber-800">Beklemeyi Düşün</p>
+          <p class="text-slate-500">Fiyatların düşme eğilimindeyse, biraz daha bekleyerek daha uygun fiyat alabilirsiniz.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-2 bg-blue-50 rounded-lg p-2.5">
+        <span class="mt-0.5">✈️</span>
+        <div>
+          <p class="font-semibold text-blue-800">Şimdi Almak İstiyorum</p>
+          <p class="text-slate-500">Planlarınız kesinleşmişse ve risk almak istemiyorsanız şimdi alabilirsiniz.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Havayolu Karşılaştırması ── -->
+<div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mt-4">
+  <div class="flex items-center justify-between mb-3">
+    <p class="font-semibold text-slate-800">Havayolu Fiyat Karşılaştırması</p>
+    <span class="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">{{ depart_date }} · {{ route_label }}</span>
+  </div>
+  <div class="grid grid-cols-3 gap-3">
+    {% for airline_name, price in all_predictions.items() %}
+    {% set is_selected = (airline_name == selected_airline) %}
+    {% set is_cheapest = (price == all_predictions.values() | min) %}
+    <div class="flex flex-col items-center gap-1.5 p-4 rounded-xl border
+      {% if is_selected %}bg-blue-50 border-brand ring-2 ring-brand
+      {% elif is_cheapest %}bg-emerald-50 border-emerald-200
+      {% else %}border-slate-100 bg-slate-50{% endif %}">
+      <p class="text-xs font-semibold text-slate-600">{{ airline_name }}</p>
+      <p class="text-lg font-bold {% if is_cheapest %}text-emerald-600{% else %}text-slate-800{% endif %}">
+        {{ "{:,.0f}".format(price) }} TL
+      </p>
+      {% if is_selected and is_cheapest %}
+        <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Seçili · En Ucuz</span>
+      {% elif is_selected %}
+        <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Seçili</span>
+      {% elif is_cheapest %}
+        <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">En Ucuz</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── Fiyat Grafiği + Yan Panel ── -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+
+  <!-- Grafik -->
+  <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+    <div class="flex items-center justify-between mb-4">
+      <p class="font-semibold text-slate-800">Fiyat Tahmin Grafiği</p>
+      <div class="flex items-center gap-4 text-xs text-slate-500">
+        <span class="flex items-center gap-1"><span class="w-4 h-0.5 bg-blue-500 inline-block"></span> Geçmiş Fiyatlar</span>
+        <span class="flex items-center gap-1"><span class="w-4 h-0.5 bg-emerald-500 inline-block border-dashed border-t-2"></span> Tahmin</span>
+      </div>
+    </div>
+    <canvas id="priceChart" height="100"></canvas>
+  </div>
+
+  <!-- İstatistikler -->
+  <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+    <p class="font-semibold text-slate-800">Rota İstatistikleri</p>
+    <div class="space-y-3 text-sm">
+      <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+        <span class="text-xl">🗺️</span>
+        <div>
+          <p class="text-xs text-slate-400">Rota Ortalaması</p>
+          <p class="font-bold text-slate-800">{{ "{:,.0f}".format(stats.global_avg) }} TL</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+        <span class="text-xl">✈️</span>
+        <div>
+          <p class="text-xs text-slate-400">Günlük Ortalama Uçuş</p>
+          <p class="font-bold text-slate-800">{{ stats.avg_flights }}</p>
+        </div>
+      </div>
+      {% if weather %}
+      <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+        <span class="text-xl">
+          {% if weather.condition == "Acik" %}☀️
+          {% elif weather.condition == "Az Bulutlu" %}🌤️
+          {% elif weather.condition == "Parcali Bulutlu" %}⛅
+          {% elif weather.condition == "Yagmurlu" %}🌧️
+          {% elif weather.condition == "Firtinali" %}🌩️
+          {% elif weather.condition == "Karli" %}❄️
+          {% else %}🌫️{% endif %}
+        </span>
+        <div>
+          <p class="text-xs text-slate-400">{{ city_name }} Hava Durumu</p>
+          <p class="font-bold text-slate-800">{{ weather.temp_max|int }}°C / {{ weather.temp_min|int }}°C</p>
+          <p class="text-xs text-slate-500">{{ weather.condition }} · 💧{{ weather.precipitation }}mm · 💨{{ weather.wind_speed|int }}km/h</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Alternatif Tarihler ── -->
+<div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mt-4">
+  <p class="font-semibold text-slate-800 mb-1">Alternatif Tarih Önerileri</p>
+  <p class="text-xs text-slate-400 mb-4">Daha uygun fiyatlar için alternatif tarihlere göz atın.</p>
+  <div class="flex items-center gap-2 overflow-x-auto pb-1">
+    {% for alt in alts %}
+    <div
+      onclick="selectAlt('{{ alt.date_iso }}')"
+      class="shrink-0 flex flex-col items-center gap-1 px-3 py-3 rounded-xl border cursor-pointer transition-all
+        {% if alt.is_selected %}bg-blue-50 border-brand ring-2 ring-brand{% else %}border-slate-100 hover:border-blue-200 hover:bg-blue-50{% endif %}"
+    >
+      <p class="text-xs text-slate-400">{{ alt.date }}</p>
+      <p class="text-xs text-slate-500">{{ alt.weekday }}</p>
+      <p class="font-bold text-sm text-slate-800">{{ "{:,.0f}".format(alt.price) }} TL</p>
+      <span class="text-xs px-2 py-0.5 rounded-full font-medium
+        {% if alt.tag == 'En Uygun' %}bg-emerald-100 text-emerald-700
+        {% elif alt.tag == 'İyi Fiyat' %}bg-blue-100 text-blue-700
+        {% elif alt.tag == 'Mevcut' %}bg-slate-200 text-slate-600
+        {% else %}bg-slate-100 text-slate-500{% endif %}
+      ">{{ alt.tag }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── Tahmini Bilet Fiyatları (Haftaya Göre / Saate Göre) ── -->
+<div id="forecast-panel" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mt-4">
+  <p class="font-semibold text-slate-800 mb-1">Tahmini Bilet Fiyatları</p>
+  <p class="text-xs text-slate-400 mb-4">Model ortalamalarına göre tahmin edilen fiyat dağılımı.</p>
+
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-5">
+    <button onclick="showTab('weekly')" id="tab-weekly"
+      class="px-4 py-1.5 rounded-lg text-sm font-medium bg-brand text-white transition-colors">
+      Güne Göre
+    </button>
+    <button onclick="showTab('hourly')" id="tab-hourly"
+      class="px-4 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+      Saate Göre
+    </button>
+  </div>
+
+  <!-- Weekly view -->
+  <div id="view-weekly">
+    <canvas id="weeklyChart" height="80"></canvas>
+    <p class="text-xs text-slate-400 mt-2">Güne tıklayarak o günün saatlik fiyat tahminlerini görüntüleyin.</p>
+  </div>
+
+  <!-- Hourly view -->
+  <div id="view-hourly" class="hidden">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-medium text-slate-700" id="hourly-title">Saatlik Dağılım</p>
+      <button onclick="showTab('weekly')" class="text-xs text-brand hover:underline">← Güne Göre</button>
+    </div>
+    <canvas id="hourlyChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- Hidden data for charts -->
+<script>
+(function() {
+  const HIST_LABELS    = {{ hist_labels | tojson }};
+  const HIST_VALUES    = {{ hist_values | tojson }};
+  const PREDICTED      = {{ predicted }};
+  const DEPART_ISO     = "{{ depart_date_iso }}";
+  const ROUTE_CODE     = "{{ route_code }}";
+  const SELECTED_AIRLINE = "{{ selected_airline if selected_airline != 'En Uygun' else '' }}";
+  const WEEKLY_LABELS  = {{ weekly_labels | tojson }};
+  const WEEKLY_VALUES  = {{ weekly_values | tojson }};
+  const WEEKLY_DATES   = {{ weekly_dates | tojson }};
+
+  // ── Price history chart ───────────────────────────────────────────────────
+  const priceCanvasOld = document.getElementById("priceChart");
+  Chart.getChart(priceCanvasOld)?.destroy();
+  const priceCanvas = document.createElement("canvas");
+  priceCanvas.id = "priceChart";
+  priceCanvas.height = 100;
+  priceCanvasOld.parentNode.replaceChild(priceCanvas, priceCanvasOld);
+  const ctx = priceCanvas.getContext("2d");
+  let priceChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: HIST_LABELS,
+      datasets: [
+        {
+          label: "Geçmiş Fiyatlar",
+          data: HIST_VALUES,
+          borderColor: "#3B82F6",
+          backgroundColor: "rgba(59,130,246,0.08)",
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: "Tahmin",
+          data: HIST_LABELS.map(l => l === DEPART_ISO ? PREDICTED : null),
+          borderColor: "#10B981",
+          backgroundColor: "#10B981",
+          borderWidth: 2,
+          pointRadius: 6,
+          pointStyle: "circle",
+          borderDash: [6,3],
+          spanGaps: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v.toLocaleString("tr") + " TL" }, grid: { color: "rgba(0,0,0,0.04)" } }
+      }
+    }
+  });
+
+  // ── Weekly bar chart ───────────────────────────────────────────────────────
+  const minWeekly = Math.min(...WEEKLY_VALUES.filter(v => v !== null));
+  const weeklyCanvasOld = document.getElementById("weeklyChart");
+  Chart.getChart(weeklyCanvasOld)?.destroy();
+  const weeklyCanvas = document.createElement("canvas");
+  weeklyCanvas.id = "weeklyChart";
+  weeklyCanvas.height = 80;
+  weeklyCanvasOld.parentNode.replaceChild(weeklyCanvas, weeklyCanvasOld);
+  const wctx = weeklyCanvas.getContext("2d");
+  let weeklyChart = new Chart(wctx, {
+    type: "bar",
+    data: {
+      labels: WEEKLY_LABELS,
+      datasets: [{
+        label: "Tahmini Fiyat (TL)",
+        data: WEEKLY_VALUES,
+        backgroundColor: WEEKLY_VALUES.map(v => v === minWeekly ? "#10B981" : "#93C5FD"),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      onClick: (e, els) => {
+        if (els.length > 0) {
+          const idx = els[0].index;
+          const dateStr = WEEKLY_DATES[idx];
+          const dayLabel = WEEKLY_LABELS[idx];
+          if (dateStr) loadHourlyForDay(ROUTE_CODE, dateStr, dayLabel);
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => c.raw.toLocaleString("tr") + " TL" } }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v.toLocaleString("tr") }, grid: { color: "rgba(0,0,0,0.04)" } }
+      }
+    }
+  });
+
+  // ── Weekly bar chart tab logic ────────────────────────────────────────────
+  function showTab(tab) {
+    document.getElementById("view-weekly").classList.toggle("hidden", tab !== "weekly");
+    document.getElementById("view-hourly").classList.toggle("hidden", tab !== "hourly");
+    document.getElementById("tab-weekly").className = tab === "weekly"
+      ? "px-4 py-1.5 rounded-lg text-sm font-medium bg-brand text-white transition-colors"
+      : "px-4 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors";
+    document.getElementById("tab-hourly").className = tab === "hourly"
+      ? "px-4 py-1.5 rounded-lg text-sm font-medium bg-brand text-white transition-colors"
+      : "px-4 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors";
+  }
+
+  let hourlyChart = null;
+
+  function loadHourlyForDay(route, dateStr, dayLabel) {
+    const airlineParam = SELECTED_AIRLINE ? `&airline=${SELECTED_AIRLINE}` : "";
+    fetch(`/hourly?route=${route}&date_str=${dateStr}${airlineParam}`)
+      .then(r => r.json())
+      .then(data => {
+        const labels = data.hourly.map(h => h.hour);
+        const values = data.hourly.map(h => h.price);
+        document.getElementById("hourly-title").textContent = `${dayLabel} – Saatlik Fiyat Tahmini`;
+        showTab("hourly");
+        if (hourlyChart) hourlyChart.destroy();
+        const hctx = document.getElementById("hourlyChart").getContext("2d");
+        hourlyChart = new Chart(hctx, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [{
+              label: "Tahmini Fiyat (TL)",
+              data: values,
+              backgroundColor: values.map(v => v === Math.min(...values) ? "#10B981" : "#93C5FD"),
+              borderRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toLocaleString("tr") + " TL" } } },
+            scales: {
+              x: { ticks: { font: { size: 9 } }, grid: { display: false } },
+              y: { ticks: { font: { size: 9 }, callback: v => v.toLocaleString("tr") }, grid: { color: "rgba(0,0,0,0.04)" } }
+            }
+          }
+        });
+      });
+  }
+
+  function selectAlt(dateStr) {
+    document.getElementById("depart-date").value = dateStr;
+  }
+
+  window.showTab = showTab;
+  window.selectAlt = selectAlt;
+  window.loadHourlyForDay = loadHourlyForDay;
+})();
+</script>

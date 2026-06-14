@@ -14,8 +14,8 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 SOURCE = "enuygun"
 CURRENCY = "TRY"
-START_DATE = date(2026, 6, 1)
-END_DATE = date(2026, 6, 14)
+START_DATE = date(2026, 6, 15)
+END_DATE = date(2026, 7, 15)
 DATE_FORMAT = "%d.%m.%Y"
 
 ROUTES = [
